@@ -16,7 +16,6 @@
 #define ENCODER_B 6
 #define ENCODER_BTN 7
 #define STEPS 4
-#define test
 
 ClickEncoder encoder(ENCODER_A, ENCODER_B, ENCODER_BTN, STEPS);
 
