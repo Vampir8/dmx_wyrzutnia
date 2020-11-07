@@ -45,7 +45,7 @@ void timerIsr() {
  * @brief hujowa procedura
  * 
  */
-void pattern1(){
+void program1(){
   digitalWrite(VALVE_PIN, HIGH);
   delay(500);
   digitalWrite(SPARK_PIN, HIGH);
@@ -54,7 +54,7 @@ void pattern1(){
   digitalWrite(SPARK_PIN, LOW);
 }
 
-void pattern2(){
+void program2(){
   for (int i = 0; i <= 5; i++) {
     digitalWrite(VALVE_PIN, HIGH);
     delay(200);
@@ -66,17 +66,34 @@ void pattern2(){
   }
 }
 
-void pattern3(){
+void program3(){
 };
 
-void pattern4(){
+void program4(){
 };
 /**
  * @brief patern 5
  * 
  */
-void pattern5(){
+void program5(){
 };
+
+void safe(){
+  if (menuMode == 3){
+    display.clear();
+    display.print("SaFE");
+  }
+}
+
+void fire(){
+  if (menuMode == 3){
+    display.clear();
+    display.print("FirE");
+  };
+  timeoutValve.prepare(time);
+  timeoutValve.reset();
+  timeoutSpark.reset();
+}
 
 /**
  * @brief Wyswietla menu na wyswietlaczu 7segmentowym
@@ -119,6 +136,10 @@ void switchMenu(){
   if (menuMode == 2){
     EEPROM.write(3, encPos);
     manAddress = encPos;
+    encPos = 0;
+    }
+  if (menuMode == 3){
+    //manAddress = encPos;
     encPos = dmxAddress;
     }
   menuMode++;
@@ -129,11 +150,11 @@ void switchMenu(){
  * 
  */
 void readEnc() {
-  if (menuMode > 2) menuMode = 1;
-  if (menuMode < 1) menuMode = 2;
+  if (menuMode > 3) menuMode = 1;
+  if (menuMode < 1) menuMode = 3;
 
   switch (menuMode){
-    case 1:{
+    case 1:{ //show dmx address
       encPos += encoder.getValue();
       if (encPos > 508) encPos = 1;
       if (encPos < 1) encPos = 508;
@@ -143,14 +164,21 @@ void readEnc() {
       }
       break;
     }
-    case 2:{
-
+    case 2:{//show manual address
       encPos += encoder.getValue();
-      if (encPos > 4) encPos = 1;
-      if (encPos < 1) encPos = 4;
+      if (encPos > 4) encPos = 0;
+      if (encPos < 0) encPos = 4;
       if (encPos != oldEncPos) {
        oldEncPos = encPos;
          printMenu(oldEncPos,menuMode); // Expect: A031
+      }
+      break;
+    case 3:{//show status
+      if (encPos != oldEncPos) {
+        oldEncPos = encPos;
+        display.clear();
+        display.print("SaFE");
+        }
       }
       break;
     }
@@ -169,7 +197,7 @@ void readEnc() {
       case ClickEncoder::Pressed:       //2
         break;
 
-      case ClickEncoder::Held:          //3
+      case ClickEncoder::Held:safe();          //3
         break;
 
       case ClickEncoder::Released:      //4
@@ -183,14 +211,6 @@ void readEnc() {
         break;}
     }
   }
-}
-
-void fire(){
-  display.clear();
-  display.print("FirE");
-  timeoutValve.prepare(time);
-  timeoutValve.reset();
-  timeoutSpark.reset();
 }
 
 void setup () {
@@ -214,7 +234,7 @@ void setup () {
   timeoutSpark.prepare(200);
 
   encPos = 1;
-  menuMode = 1;
+  menuMode = 3;
 
   dmxAddress = (EEPROM.read(1) << 8) + EEPROM.read(0);
   encPos = dmxAddress;
@@ -230,28 +250,36 @@ void setup () {
   delay(1000);                // wait 1000 ms
   display.print("InIt");      // display INIT on the display
   delay(1000);                // wait 1000 ms
+  display.print("dOnE");      // display DONE on the display
+  delay(1000);                // wait 1000 ms
 }
 
 void loop() {
-  // Calculate how long no data backet was received
   readEnc();
+  // Calculate how long no data backet was received
   unsigned long lastPacket = DMXSerial.noDataSince();
   digitalWrite(VALVE_PIN, !timeoutValve.time_over());
   digitalWrite(SPARK_PIN, !timeoutSpark.time_over());
 
-  if (manAddress == 1) 
-    if (digitalRead(MANUAL1_PIN) == LOW)
-      fire();
-  if (manAddress == 2)
-    if (digitalRead(MANUAL2_PIN) == LOW)
-      fire();
-  if (manAddress == 3)
-    if (digitalRead(MANUAL3_PIN) == LOW)
-      fire();
-  if (manAddress == 4)
-    if (digitalRead(MANUAL4_PIN) == LOW)
-      fire();
+  if (digitalRead(MANUAL1_PIN) == LOW){
+    if (manAddress == 0)program1();
+    if (manAddress == 1)fire();
+  }
+  
+  if (digitalRead(MANUAL2_PIN) == LOW){
+    if (manAddress == 0)program2();
+    if (manAddress == 2)fire();
+  }
+    
+  if (digitalRead(MANUAL3_PIN) == LOW){
+    if (manAddress == 0)program3();
+    if (manAddress == 3)fire();
+  }
 
+  if (digitalRead(MANUAL4_PIN) == LOW){
+    if (manAddress == 0)program4();
+    if (manAddress == 4)fire();
+  }
 
   if (lastPacket < 500) {
     digitalWrite(LED_PIN, HIGH);
@@ -268,11 +296,11 @@ void loop() {
       if (dmxState != currState) {
         currState = dmxState;
         if (dmxState == true) {
-          if (dmxMode >= 200 && dmxMode < 210){pattern1();};
-          if (dmxMode >= 210 && dmxMode < 220){pattern2();};
-          if (dmxMode >= 220 && dmxMode < 230){pattern3();};
-          if (dmxMode >= 230 && dmxMode < 240){pattern4();};
-          if (dmxMode >= 240 && dmxMode < 250){pattern5();};
+          if (dmxMode >= 200 && dmxMode < 210){program1();};
+          if (dmxMode >= 210 && dmxMode < 220){program2();};
+          if (dmxMode >= 220 && dmxMode < 230){program3();};
+          if (dmxMode >= 230 && dmxMode < 240){program4();};
+          if (dmxMode >= 240 && dmxMode < 250){program5();};
 
           if (dmxMode > 249){
             timeoutValve.prepare(time);
