@@ -15,6 +15,10 @@
 #define ENCODER_A 5
 #define ENCODER_B 6
 #define ENCODER_BTN 7
+#define MANUAL1_PIN 8
+#define MANUAL2_PIN 9
+#define MANUAL3_PIN 10  
+#define MANUAL4_PIN 11
 #define STEPS 4
 
 ClickEncoder encoder(ENCODER_A, ENCODER_B, ENCODER_BTN, STEPS);
@@ -30,8 +34,8 @@ uint8_t buttonState;
 uint8_t prevState = -1;
 uint8_t currState = -1;
 uint16_t time = 1000;
-uint8_t state,mode;
-uint16_t address;
+uint8_t dmxState,dmxMode,menuMode,manState,manAddress;
+uint16_t dmxAddress;
 
 void timerIsr() {
   encoder.service();
@@ -67,22 +71,91 @@ void pattern3(){
 
 void pattern4(){
 };
-
+/**
+ * @brief patern 5
+ * 
+ */
 void pattern5(){
 };
+
+/**
+ * @brief Wyswietla menu na wyswietlaczu 7segmentowym
+ * 
+ * @param number numer
+ * @param mode prefix numeru
+ */
+void printMenu(int16_t number,uint8_t mode) {
+  // clear the display first
+  display.clear();
+  if (mode == 1) {
+    if (number > 999) {
+      display.setCursor(0, 0);
+    } else if (number > 99) {
+      display.print('A');
+      display.setCursor(0, 1);
+    } else if (number > 9) {
+      display.print(F("A0"));
+      display.setCursor(0, 2);
+    } else {
+      display.print(F("A00"));
+      display.setCursor(0, 3);
+    }
+  }
+  if (mode == 2) {
+    display.print(F("Ch "));
+    display.setCursor(0, 3);
+  }
+  display.print(number);
+}
+
+void switchMenu(){
+  display.blink();
+  if (menuMode == 1){
+    EEPROM.write(0, encPos);
+    EEPROM.write(1, encPos >> 8);
+    dmxAddress = encPos;
+    encPos = manAddress;
+    }
+  if (menuMode == 2){
+    EEPROM.write(3, encPos);
+    manAddress = encPos;
+    encPos = dmxAddress;
+    }
+  menuMode++;
+}
+
 /**
  * @brief odczytuje położenie enkodera
  * 
  */
 void readEnc() {
-  encPos += encoder.getValue();
+  if (menuMode > 2) menuMode = 1;
+  if (menuMode < 1) menuMode = 2;
 
-  if (encPos > 508) encPos = 1;
-  if (encPos < 1) encPos = 508;
-  if (encPos != oldEncPos) {
-    oldEncPos = encPos;
-     display.printNumber(oldEncPos,true); // Expect: A031
+  switch (menuMode){
+    case 1:{
+      encPos += encoder.getValue();
+      if (encPos > 508) encPos = 1;
+      if (encPos < 1) encPos = 508;
+      if (encPos != oldEncPos) {
+       oldEncPos = encPos;
+         printMenu(oldEncPos,menuMode); // Expect: A031
+      }
+      break;
+    }
+    case 2:{
+
+      encPos += encoder.getValue();
+      if (encPos > 4) encPos = 1;
+      if (encPos < 1) encPos = 4;
+      if (encPos != oldEncPos) {
+       oldEncPos = encPos;
+         printMenu(oldEncPos,menuMode); // Expect: A031
+      }
+      break;
+    }
   }
+  
   buttonState = encoder.getButton();
 
   if (buttonState != 0) {
@@ -105,10 +178,7 @@ void readEnc() {
         break;
 
       case ClickEncoder::Clicked:{       //5
-        display.blink();
-        EEPROM.write(0, encPos);
-        EEPROM.write(1, encPos >> 8);
-        address = encPos;
+        switchMenu();
         break;}
 
       case ClickEncoder::DoubleClicked:{ //6
@@ -117,6 +187,12 @@ void readEnc() {
         break;}
     }
   }
+}
+
+void fire(){
+  timeoutValve.prepare(time);
+  timeoutValve.reset();
+  timeoutSpark.reset();
 }
 
 void setup () {
@@ -136,8 +212,11 @@ void setup () {
   timeoutSpark.prepare(200);
 
   encPos = 1;
+  menuMode = 1;
 
-  address = (EEPROM.read(1) << 8) + EEPROM.read(0);
+  dmxAddress = (EEPROM.read(1) << 8) + EEPROM.read(0);
+  encPos = dmxAddress;
+  manAddress = EEPROM.read(3);
 
   Timer1.initialize(1000);
   Timer1.attachInterrupt(timerIsr);
@@ -145,6 +224,8 @@ void setup () {
   encoder.setAccelerationEnabled(true);
   display.begin();            // initializes the display
   display.setBacklight(50);  // set the brightness to 100 %
+  display.print("   WYrZuTnIA OGNIA    ");
+  delay(1000);                // wait 1000 ms
   display.print("InIt");      // display INIT on the display
   delay(1000);                // wait 1000 ms
 }
@@ -158,26 +239,26 @@ void loop() {
 
   if (lastPacket < 500) {
     digitalWrite(LED_PIN, HIGH);
-    if (DMXSerial.read(address) == 170) { //safety channel 10101010 
-      mode = DMXSerial.read(address+1);
-      if (mode > 200) state = true; else state = false; 
+    if (DMXSerial.read(dmxAddress) == 170) { //safety channel 10101010 
+      dmxMode = DMXSerial.read(dmxAddress+1);
+      if (dmxMode > 200) dmxState = true; else dmxState = false; 
 
-      if (DMXSerial.read(address+2) > 0) {
-        time = 20*DMXSerial.read(address+2);
+      if (DMXSerial.read(dmxAddress+2) > 0) {
+        time = 20*DMXSerial.read(dmxAddress+2);
        } else {
         time = 1000;
        }
 
-      if (state != currState) {
-        currState = state;
-        if (state == true) {
-          if (mode >= 200 && mode < 210){pattern1();};
-          if (mode >= 210 && mode < 220){pattern2();};
-          if (mode >= 220 && mode < 230){pattern3();};
-          if (mode >= 230 && mode < 240){pattern4();};
-          if (mode >= 240 && mode < 250){pattern5();};
+      if (dmxState != currState) {
+        currState = dmxState;
+        if (dmxState == true) {
+          if (dmxMode >= 200 && dmxMode < 210){pattern1();};
+          if (dmxMode >= 210 && dmxMode < 220){pattern2();};
+          if (dmxMode >= 220 && dmxMode < 230){pattern3();};
+          if (dmxMode >= 230 && dmxMode < 240){pattern4();};
+          if (dmxMode >= 240 && dmxMode < 250){pattern5();};
 
-          if (mode > 249){
+          if (dmxMode > 249){
             timeoutValve.prepare(time);
             timeoutValve.reset();
             timeoutSpark.reset();
