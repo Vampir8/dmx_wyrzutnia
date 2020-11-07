@@ -169,10 +169,8 @@ void readEnc() {
       case ClickEncoder::Pressed:       //2
         break;
 
-      case ClickEncoder::Held:{          //3
-        display.clear();
-        display.print("HELd");
-        break;}
+      case ClickEncoder::Held:          //3
+        break;
 
       case ClickEncoder::Released:      //4
         break;
@@ -182,14 +180,14 @@ void readEnc() {
         break;}
 
       case ClickEncoder::DoubleClicked:{ //6
-        display.clear();
-        display.print("FirE");
         break;}
     }
   }
 }
 
 void fire(){
+  display.clear();
+  display.print("FirE");
   timeoutValve.prepare(time);
   timeoutValve.reset();
   timeoutSpark.reset();
@@ -206,6 +204,10 @@ void setup () {
   pinMode(VALVE_PIN, OUTPUT); // sets the digital pin as output
   pinMode(SPARK_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
+  pinMode(MANUAL1_PIN, INPUT_PULLUP);
+  pinMode(MANUAL2_PIN, INPUT_PULLUP);
+  pinMode(MANUAL3_PIN, INPUT_PULLUP);
+  pinMode(MANUAL4_PIN, INPUT_PULLUP);
   pinMode(4, OUTPUT);
   digitalWrite(4,HIGH);
   timeoutValve.prepare(1000);
@@ -236,6 +238,20 @@ void loop() {
   unsigned long lastPacket = DMXSerial.noDataSince();
   digitalWrite(VALVE_PIN, !timeoutValve.time_over());
   digitalWrite(SPARK_PIN, !timeoutSpark.time_over());
+
+  if (manAddress == 1) 
+    if (digitalRead(MANUAL1_PIN) == LOW)
+      fire();
+  if (manAddress == 2)
+    if (digitalRead(MANUAL2_PIN) == LOW)
+      fire();
+  if (manAddress == 3)
+    if (digitalRead(MANUAL3_PIN) == LOW)
+      fire();
+  if (manAddress == 4)
+    if (digitalRead(MANUAL4_PIN) == LOW)
+      fire();
+
 
   if (lastPacket < 500) {
     digitalWrite(LED_PIN, HIGH);
