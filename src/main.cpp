@@ -7,18 +7,19 @@
 #include <TimerOne.h>
 #include <EEPROM.h>
 
-#define VALVE_PIN A0
-#define SPARK_PIN A1
-#define LED_PIN   13
+#define VALVE_PIN   A0
+#define SPARK_PIN   A1
+#define LED_PIN     13
 #define DISPLAY_CLK 2
 #define DISPLAY_DIO 3
-#define ENCODER_A 5
-#define ENCODER_B 6
+#define ENCODER_A   5
+#define ENCODER_B   6
 #define ENCODER_BTN 7
 #define MANUAL1_PIN 8
 #define MANUAL2_PIN 9
 #define MANUAL3_PIN 10  
 #define MANUAL4_PIN 11
+#define SAFETY_PIN  12
 #define STEPS 4
 
 ClickEncoder encoder(ENCODER_A, ENCODER_B, ENCODER_BTN, STEPS);
@@ -34,8 +35,10 @@ uint8_t buttonState;
 uint8_t prevState = -1;
 uint8_t currState = -1;
 uint16_t time = 1000;
+uint8_t actualStatus,oldActualStatus;
 uint8_t dmxState,dmxMode,menuMode,manState,manAddress;
 uint16_t dmxAddress;
+String status[6] = { "SAFE", "rdY", "FirE" , "InIt" , "dOnE", "InFo"};
 
 void timerIsr() {
   encoder.service();
@@ -81,14 +84,13 @@ void program5(){
 void safe(){
   if (menuMode == 3){
     display.clear();
-    display.print("SaFE");
+    display.print(status[0]);
   }
 }
 
 void fire(){
   if (menuMode == 3){
-    display.clear();
-    display.print("FirE");
+    actualStatus=2;
   };
   timeoutValve.prepare(time);
   timeoutValve.reset();
@@ -174,10 +176,10 @@ void readEnc() {
       }
       break;
     case 3:{//show status
-      if (encPos != oldEncPos) {
-        oldEncPos = encPos;
+      if (actualStatus != oldActualStatus) {
+        oldActualStatus = actualStatus;
         display.clear();
-        display.print("SaFE");
+        display.print(status[actualStatus]);
         }
       }
       break;
@@ -220,21 +222,30 @@ void setup () {
   DMXSerial.write(1, 0);
   DMXSerial.write(2, 0);
   DMXSerial.write(3, 0);
-  
-  pinMode(VALVE_PIN, OUTPUT); // sets the digital pin as output
+  // sets the digital pin as output
+  pinMode(VALVE_PIN, OUTPUT); 
   pinMode(SPARK_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
-  pinMode(MANUAL1_PIN, INPUT_PULLUP);
-  pinMode(MANUAL2_PIN, INPUT_PULLUP);
-  pinMode(MANUAL3_PIN, INPUT_PULLUP);
-  pinMode(MANUAL4_PIN, INPUT_PULLUP);
+  // sets the digital pin as input
+  pinMode(SAFETY_PIN, INPUT_PULLUP); //show only safe
+  pinMode(MANUAL1_PIN, INPUT);
+  pinMode(MANUAL2_PIN, INPUT);
+  pinMode(MANUAL3_PIN, INPUT);
+  pinMode(MANUAL4_PIN, INPUT);
+  //power for encoder, delete later!
   pinMode(4, OUTPUT);
   digitalWrite(4,HIGH);
+  pinMode(A0, OUTPUT);
+  digitalWrite(4,LOW);
+  pinMode(A1, OUTPUT);
+  digitalWrite(4,HIGH);
+  
   timeoutValve.prepare(1000);
   timeoutSpark.prepare(200);
 
   encPos = 1;
   menuMode = 3;
+  actualStatus = 0;
 
   dmxAddress = (EEPROM.read(1) << 8) + EEPROM.read(0);
   encPos = dmxAddress;
@@ -246,7 +257,7 @@ void setup () {
   encoder.setAccelerationEnabled(true);
   display.begin();            // initializes the display
   display.setBacklight(50);  // set the brightness to 100 %
-  display.print("   WYrZuTnIA OGNIA    ");
+  //display.print("   WYrZuTnIA OGNIA    ");
   delay(1000);                // wait 1000 ms
   display.print("InIt");      // display INIT on the display
   delay(1000);                // wait 1000 ms
@@ -261,23 +272,30 @@ void loop() {
   digitalWrite(VALVE_PIN, !timeoutValve.time_over());
   digitalWrite(SPARK_PIN, !timeoutSpark.time_over());
 
+  if (digitalRead(MANUAL1_PIN) == HIGH){
+    //if (manAddress == 0)fire();
+    //if (manAddress == 1)fire();
+    actualStatus = 2;
+  }
   if (digitalRead(MANUAL1_PIN) == LOW){
-    if (manAddress == 0)program1();
-    if (manAddress == 1)fire();
+    actualStatus = 1;
   }
   
-  if (digitalRead(MANUAL2_PIN) == LOW){
-    if (manAddress == 0)program2();
+  if (digitalRead(MANUAL2_PIN) == HIGH){
+    actualStatus = 3;
+    if (manAddress == 0)fire();
     if (manAddress == 2)fire();
   }
     
-  if (digitalRead(MANUAL3_PIN) == LOW){
-    if (manAddress == 0)program3();
+  if (digitalRead(MANUAL3_PIN) == HIGH){
+    actualStatus = 4;
+    if (manAddress == 0)fire();
     if (manAddress == 3)fire();
   }
 
-  if (digitalRead(MANUAL4_PIN) == LOW){
-    if (manAddress == 0)program4();
+  if (digitalRead(MANUAL4_PIN) == HIGH){
+    actualStatus = 5;
+    if (manAddress == 0)fire();
     if (manAddress == 4)fire();
   }
 
