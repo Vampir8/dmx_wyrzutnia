@@ -38,7 +38,7 @@ uint16_t time = 1000;
 uint8_t actualStatus,oldActualStatus;
 uint8_t dmxState,dmxMode,menuMode,manState,manAddress;
 uint16_t dmxAddress;
-String status[6] = { "SAFE", "rdY", "FirE" , "InIt" , "dOnE", "InFo"};
+const char *status[] = {"SAFE", " rdY", "FirE" , "InIt" , "dOnE", "InFo" , "FaiL"};
 
 void timerIsr() {
   encoder.service();
@@ -80,13 +80,6 @@ void program4(){
  */
 void program5(){
 };
-
-void safe(){
-  if (menuMode == 3){
-    display.clear();
-    display.print(status[0]);
-  }
-}
 
 void fire(){
   if (menuMode == 3){
@@ -166,7 +159,8 @@ void readEnc() {
       }
       break;
     }
-    case 2:{//show manual address
+    case 2:{
+      //show manual address
       encPos += encoder.getValue();
       if (encPos > 4) encPos = 0;
       if (encPos < 0) encPos = 4;
@@ -174,17 +168,19 @@ void readEnc() {
        oldEncPos = encPos;
          printMenu(oldEncPos,menuMode); // Expect: A031
       }
+      oldActualStatus = 0;
       break;
+    }
     case 3:{//show status
       if (actualStatus != oldActualStatus) {
         oldActualStatus = actualStatus;
         display.clear();
-        display.print(status[actualStatus]);
+        display.print(status[1]);
         }
-      }
       break;
     }
   }
+  
   
   buttonState = encoder.getButton();
 
@@ -199,7 +195,7 @@ void readEnc() {
       case ClickEncoder::Pressed:       //2
         break;
 
-      case ClickEncoder::Held:safe();          //3
+      case ClickEncoder::Held:          //3
         break;
 
       case ClickEncoder::Released:      //4
@@ -232,7 +228,7 @@ void setup () {
   pinMode(MANUAL2_PIN, INPUT);
   pinMode(MANUAL3_PIN, INPUT);
   pinMode(MANUAL4_PIN, INPUT);
-  //power for encoder, delete later!
+  //power for encoder, rf module, delete later!
   pinMode(4, OUTPUT);
   digitalWrite(4,HIGH);
   pinMode(A0, OUTPUT);
@@ -273,8 +269,8 @@ void loop() {
   digitalWrite(SPARK_PIN, !timeoutSpark.time_over());
 
   if (digitalRead(MANUAL1_PIN) == HIGH){
-    //if (manAddress == 0)fire();
-    //if (manAddress == 1)fire();
+    if (manAddress == 0)program1();
+    if (manAddress == 1)fire();
     actualStatus = 2;
   }
   if (digitalRead(MANUAL1_PIN) == LOW){
@@ -283,19 +279,19 @@ void loop() {
   
   if (digitalRead(MANUAL2_PIN) == HIGH){
     actualStatus = 3;
-    if (manAddress == 0)fire();
-    if (manAddress == 2)fire();
+    if (manAddress == 0)program2();
+    if (manAddress == 3)fire();
   }
     
   if (digitalRead(MANUAL3_PIN) == HIGH){
     actualStatus = 4;
-    if (manAddress == 0)fire();
-    if (manAddress == 3)fire();
+    if (manAddress == 0)program3();
+    if (manAddress == 4)fire();
   }
 
   if (digitalRead(MANUAL4_PIN) == HIGH){
     actualStatus = 5;
-    if (manAddress == 0)fire();
+    if (manAddress == 0)program4();
     if (manAddress == 4)fire();
   }
 
