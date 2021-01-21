@@ -7,8 +7,10 @@
 #include <TimerOne.h>
 #include <EEPROM.h>
 
-#define VALVE_PIN   A0
-#define SPARK_PIN   A1
+#define VALVE_HP_PIN  A0
+#define VALVE_LP_PIN  A1
+#define SPARK_PIN     A2
+#define V_PIN         A3
 #define LED_PIN     13
 #define DISPLAY_CLK 2
 #define DISPLAY_DIO 3
@@ -40,6 +42,8 @@ uint8_t dmxState,dmxMode,menuMode,manState,manAddress;
 uint16_t dmxAddress;
 const char *status[] = {"SAFE", " rdY", "FirE" , "InIt" , "dOnE", "InFo" , "FaiL"};
 
+void readEnc();
+
 void timerIsr() {
   encoder.service();
 }
@@ -49,24 +53,30 @@ void timerIsr() {
  * 
  */
 void program1(){
-  digitalWrite(VALVE_PIN, HIGH);
+  actualStatus = 2;
+  readEnc();
+  digitalWrite(VALVE_HP_PIN, HIGH);
   delay(500);
   digitalWrite(SPARK_PIN, HIGH);
   delay(200);
-  digitalWrite(VALVE_PIN, LOW);
+  digitalWrite(VALVE_HP_PIN, LOW);
   digitalWrite(SPARK_PIN, LOW);
+  actualStatus = 1;
 }
 
 void program2(){
+  actualStatus = 2;
+  readEnc();
   for (int i = 0; i <= 5; i++) {
-    digitalWrite(VALVE_PIN, HIGH);
+    digitalWrite(VALVE_HP_PIN, HIGH);
     delay(200);
     digitalWrite(SPARK_PIN, HIGH);
     delay(200);
-    digitalWrite(VALVE_PIN, LOW);
+    digitalWrite(VALVE_HP_PIN, LOW);
     digitalWrite(SPARK_PIN, LOW);
     delay(200);
   }
+  actualStatus = 1;
 }
 
 void program3(){
@@ -175,7 +185,7 @@ void readEnc() {
       if (actualStatus != oldActualStatus) {
         oldActualStatus = actualStatus;
         display.clear();
-        display.print(status[1]);
+        display.print(status[actualStatus]);
         }
       break;
     }
@@ -219,7 +229,8 @@ void setup () {
   DMXSerial.write(2, 0);
   DMXSerial.write(3, 0);
   // sets the digital pin as output
-  pinMode(VALVE_PIN, OUTPUT); 
+  pinMode(VALVE_HP_PIN, OUTPUT);
+  pinMode(VALVE_LP_PIN, OUTPUT);  
   pinMode(SPARK_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
   // sets the digital pin as input
@@ -228,20 +239,13 @@ void setup () {
   pinMode(MANUAL2_PIN, INPUT);
   pinMode(MANUAL3_PIN, INPUT);
   pinMode(MANUAL4_PIN, INPUT);
-  //power for encoder, rf module, delete later!
-  pinMode(4, OUTPUT);
-  digitalWrite(4,HIGH);
-  pinMode(A0, OUTPUT);
-  digitalWrite(4,LOW);
-  pinMode(A1, OUTPUT);
-  digitalWrite(4,HIGH);
   
   timeoutValve.prepare(1000);
   timeoutSpark.prepare(200);
 
   encPos = 1;
   menuMode = 3;
-  actualStatus = 0;
+  actualStatus = 1;
 
   dmxAddress = (EEPROM.read(1) << 8) + EEPROM.read(0);
   encPos = dmxAddress;
@@ -256,41 +260,35 @@ void setup () {
   //display.print("   WYrZuTnIA OGNIA    ");
   delay(1000);                // wait 1000 ms
   display.print("InIt");      // display INIT on the display
-  delay(1000);                // wait 1000 ms
+  delay(500);                // wait 1000 ms
   display.print("dOnE");      // display DONE on the display
-  delay(1000);                // wait 1000 ms
+  delay(500);                // wait 1000 ms
 }
 
 void loop() {
   readEnc();
   // Calculate how long no data backet was received
   unsigned long lastPacket = DMXSerial.noDataSince();
-  digitalWrite(VALVE_PIN, !timeoutValve.time_over());
+  digitalWrite(VALVE_HP_PIN, !timeoutValve.time_over());
   digitalWrite(SPARK_PIN, !timeoutSpark.time_over());
+  if (timeoutValve.time_over()) {actualStatus = 1;}
 
   if (digitalRead(MANUAL1_PIN) == HIGH){
     if (manAddress == 0)program1();
     if (manAddress == 1)fire();
-    actualStatus = 2;
   }
-  if (digitalRead(MANUAL1_PIN) == LOW){
-    actualStatus = 1;
-  }
-  
+
   if (digitalRead(MANUAL2_PIN) == HIGH){
-    actualStatus = 3;
     if (manAddress == 0)program2();
-    if (manAddress == 3)fire();
+    if (manAddress == 2)fire();
   }
     
   if (digitalRead(MANUAL3_PIN) == HIGH){
-    actualStatus = 4;
     if (manAddress == 0)program3();
-    if (manAddress == 4)fire();
+    if (manAddress == 3)fire();
   }
 
   if (digitalRead(MANUAL4_PIN) == HIGH){
-    actualStatus = 5;
     if (manAddress == 0)program4();
     if (manAddress == 4)fire();
   }
@@ -327,7 +325,7 @@ void loop() {
   } else {
     // Show pure red color, when no data was received since 5 seconds or more.
     digitalWrite(LED_PIN, LOW);
-    digitalWrite(VALVE_PIN, LOW);
+    digitalWrite(VALVE_HP_PIN, LOW);
     digitalWrite(SPARK_PIN, LOW);
   } // if*/
 }
